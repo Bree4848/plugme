@@ -1,0 +1,148 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
+
+type Ad = {
+  id: string
+  title: string
+  description: string
+  status: string
+  image_url: string | null
+}
+
+export default function DashboardPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [ads, setAds] = useState<Ad[]>([])
+
+  useEffect(() => {
+    async function loadDashboard() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        setAds(data)
+      }
+
+      setLoading(false)
+    }
+
+    loadDashboard()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading dashboard...
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 px-4 py-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">My Dashboard</h1>
+            <p className="text-gray-600">
+              Manage your adverts on PlugMe
+            </p>
+          </div>
+
+          <Link
+            href="/post-ad"
+            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold text-center"
+          >
+            + Post New Ad
+          </Link>
+        </div>
+
+        {/* Ads */}
+        {ads.length === 0 ? (
+          <div className="mt-12 bg-white rounded-2xl p-8 text-center shadow-sm">
+            <p className="text-gray-600">
+              You haven’t posted any ads yet.
+            </p>
+
+            <Link
+              href="/post-ad"
+              className="inline-block mt-4 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold"
+            >
+              Post Your First Ad
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {ads.map(ad => (
+              <div
+                key={ad.id}
+                className="bg-white rounded-2xl shadow-sm overflow-hidden"
+              >
+                {ad.image_url && (
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title}
+                    className="w-full h-40 object-cover"
+                  />
+                )}
+
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-lg">
+                      {ad.title}
+                    </h3>
+
+                    <span
+                      className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                        ad.status === 'approved'
+                          ? 'bg-green-100 text-green-700'
+                          : ad.status === 'rejected'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {ad.status}
+                    </span>
+                  </div>
+
+                  <p className="text-gray-600 text-sm line-clamp-3">
+                    {ad.description}
+                  </p>
+
+                  <div className="mt-4 flex gap-3">
+                    <button className="text-blue-600 font-medium text-sm">
+                      View
+                    </button>
+
+                    {ad.status === 'pending' && (
+                      <button className="text-gray-500 text-sm">
+                        Awaiting approval
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
