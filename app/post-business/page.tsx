@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useRouter } from 'next/navigation'
 
 export default function PostBusinessPage() {
   const router = useRouter()
@@ -10,29 +10,21 @@ export default function PostBusinessPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-
   const [form, setForm] = useState({
     name: '',
+    category: '',
     description: '',
     contact_person: '',
     phone: '',
     email: '',
   })
 
+  const [imageFile, setImageFile] = useState<File | null>(null)
+
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -45,14 +37,13 @@ export default function PostBusinessPage() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      setError('You must be logged in to post a business.')
+      setError('You must be logged in')
       setLoading(false)
       return
     }
 
-    let imageUrl: string | null = null
+    let imageUrl = null
 
-    // ⬆️ Upload image
     if (imageFile) {
       const fileExt = imageFile.name.split('.').pop()
       const fileName = `${user.id}-${Date.now()}.${fileExt}`
@@ -74,127 +65,139 @@ export default function PostBusinessPage() {
       imageUrl = data.publicUrl
     }
 
-    // ⬆️ Insert business
     const { error: insertError } = await supabase
       .from('businesses')
       .insert({
-        user_id: user.id,
-        name: form.name,
-        description: form.description,
-        contact_person: form.contact_person,
-        phone: form.phone,
-        email: form.email,
+        ...form,
         image_url: imageUrl,
-        status: 'pending',
+        user_id: user.id,
       })
 
     if (insertError) {
       setError(insertError.message)
-      setLoading(false)
-      return
+    } else {
+      router.push('/dashboard')
     }
 
-    router.push('/')
+    setLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-2xl bg-white rounded-xl shadow-md p-6 md:p-8">
+    <div className="flex justify-center px-4 py-10">
+      <div className="w-full max-w-2xl rounded-xl bg-white p-6 border shadow-sm">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Post a Business
+        </h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Add your business to the PlugMe directory
+        </p>
 
-        {/* Header */}
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Post Your Business
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Promote your business on PlugMe
-          </p>
-        </div>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          {error && (
+            <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Business Name */}
-          <input
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            required
-            placeholder="Business Name"
-            className="w-full rounded-lg border px-4 py-2"
-          />
-
-          {/* Description */}
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            required
-            rows={4}
-            placeholder="Describe your business"
-            className="w-full rounded-lg border px-4 py-2"
-          />
-
-          {/* Contact */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Business Info */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Business name
+            </label>
             <input
-              name="contact_person"
-              value={form.contact_person}
-              onChange={handleChange}
+              name="name"
               required
-              placeholder="Contact Person"
-              className="rounded-lg border px-4 py-2"
-            />
-            <input
-              name="phone"
-              value={form.phone}
               onChange={handleChange}
-              required
-              placeholder="Phone Number"
-              className="rounded-lg border px-4 py-2"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
             />
           </div>
 
-          <input
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            required
-            placeholder="Email Address"
-            className="w-full rounded-lg border px-4 py-2"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Category
+            </label>
+            <input
+              name="category"
+              required
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Description
+            </label>
+            <textarea
+              name="description"
+              rows={4}
+              required
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            />
+          </div>
+
+          {/* Contact Info */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Contact person
+              </label>
+              <input
+                name="contact_person"
+                required
+                onChange={handleChange}
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Phone number
+              </label>
+              <input
+                name="phone"
+                required
+                onChange={handleChange}
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Email address
+            </label>
+            <input
+              name="email"
+              type="email"
+              required
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
 
           {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Business Image
+            <label className="block text-sm font-medium text-gray-700">
+              Business image
             </label>
-
-            {imagePreview && (
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="mb-3 h-40 w-full object-cover rounded-lg border"
-              />
-            )}
-
             <input
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
-              className="text-sm"
+              onChange={(e) =>
+                setImageFile(e.target.files?.[0] ?? null)
+              }
+              className="mt-1 block w-full text-sm"
             />
           </div>
-
-          {error && (
-            <p className="text-red-600 text-sm">{error}</p>
-          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+            className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
-            {loading ? 'Submitting...' : 'Submit Business'}
+            {loading ? 'Posting...' : 'Post Business'}
           </button>
         </form>
       </div>
