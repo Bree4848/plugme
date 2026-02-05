@@ -9,6 +9,7 @@ export default function PostBusinessPage() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -31,6 +32,7 @@ export default function PostBusinessPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(false)
 
     const {
       data: { user },
@@ -76,7 +78,18 @@ export default function PostBusinessPage() {
     if (insertError) {
       setError(insertError.message)
     } else {
-      router.push('/dashboard')
+      setSuccess(true)
+      setForm({
+        name: '',
+        category: '',
+        description: '',
+        contact_person: '',
+        phone: '',
+        email: '',
+      })
+      setImageFile(null)
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccess(false), 5000)
     }
 
     setLoading(false)
@@ -99,6 +112,12 @@ export default function PostBusinessPage() {
             </div>
           )}
 
+          {success && (
+            <div className="rounded-lg bg-green-50 px-4 py-2 text-sm text-green-600">
+              Business posted successfully! ✓
+            </div>
+          )}
+
           {/* Business Info */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -107,6 +126,7 @@ export default function PostBusinessPage() {
             <input
               name="name"
               required
+              value={form.name}
               onChange={handleChange}
               className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
             />
@@ -119,6 +139,7 @@ export default function PostBusinessPage() {
             <input
               name="category"
               required
+              value={form.category}
               onChange={handleChange}
               className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
             />
@@ -132,6 +153,7 @@ export default function PostBusinessPage() {
               name="description"
               rows={4}
               required
+              value={form.description}
               onChange={handleChange}
               className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
             />
@@ -146,6 +168,7 @@ export default function PostBusinessPage() {
               <input
                 name="contact_person"
                 required
+                value={form.contact_person}
                 onChange={handleChange}
                 className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
               />
@@ -158,6 +181,7 @@ export default function PostBusinessPage() {
               <input
                 name="phone"
                 required
+                value={form.phone}
                 onChange={handleChange}
                 className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
               />
@@ -172,6 +196,7 @@ export default function PostBusinessPage() {
               name="email"
               type="email"
               required
+              value={form.email}
               onChange={handleChange}
               className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
             />
@@ -185,6 +210,7 @@ export default function PostBusinessPage() {
             <input
               type="file"
               accept="image/*"
+              value={imageFile ? undefined : ''}
               onChange={(e) =>
                 setImageFile(e.target.files?.[0] ?? null)
               }

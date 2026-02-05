@@ -1,11 +1,56 @@
+'use client'
+
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function HomePage() {
+  const [ad, setAd] = useState<any>(null)
+  const [user, setUser] = useState<any>(null)
+
+  // Get logged-in user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
+  }, [])
+
+  // Fetch latest approved ad
+  useEffect(() => {
+    const fetchLatestAd = async () => {
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .eq('approved', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle() // ✅ IMPORTANT: avoids crash if no ads
+
+      if (!error) {
+        setAd(data)
+      }
+    }
+
+    fetchLatestAd()
+  }, [])
+
+  // Prepare media URL safely
+  let publicUrl: string | null = null
+
+  if (ad?.media_url) {
+    const { data } = supabase.storage
+      .from('ads')
+      .getPublicUrl(ad.media_url)
+
+    publicUrl = data?.publicUrl ?? null
+  }
+
   return (
-    <section className="relative overflow-hidden bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <section className="relative bg-white">
+      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          {/* Left: Text */}
+
+          {/* LEFT: HERO TEXT */}
           <div>
             <span className="inline-block rounded-full bg-blue-50 px-4 py-1 text-sm font-medium text-blue-600">
               Discover • Connect • Grow
@@ -24,7 +69,7 @@ export default function HomePage() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                href="/listings"
+                href="/businesses"
                 className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
               >
                 Browse Businesses
@@ -39,30 +84,62 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right: Visual Card */}
+          {/* RIGHT: AD CARD (OPTIONAL) */}
           <div className="relative">
-            <div className="rounded-2xl border bg-gray-50 p-6 shadow-sm">
-              <div className="space-y-4">
-                <div className="h-4 w-1/3 rounded bg-gray-200" />
-                <div className="h-6 w-2/3 rounded bg-gray-300" />
-                <div className="h-4 w-full rounded bg-gray-200" />
-                <div className="h-4 w-5/6 rounded bg-gray-200" />
+            {ad && publicUrl ? (
+              <div className="overflow-hidden rounded-2xl border bg-white shadow-lg">
 
-                <div className="mt-6 flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-blue-200" />
-                  <div className="space-y-2">
-                    <div className="h-4 w-24 rounded bg-gray-300" />
-                    <div className="h-3 w-32 rounded bg-gray-200" />
+                {/* IMAGE */}
+                {ad.media_type?.startsWith('image/') && (
+                  <img
+                    src={publicUrl}
+                    alt={ad.title}
+                    className="h-64 w-full object-cover"
+                  />
+                )}
+
+                {/* VIDEO */}
+                {ad.media_type?.startsWith('video/') && (
+                  <video
+                    src={publicUrl}
+                    className="h-64 w-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  />
+                )}
+
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {ad.title}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {new Date(ad.created_at).toLocaleString(undefined, {
+                        timeZoneName: 'short',
+                      })}
+                    </p>
                   </div>
-                </div>
 
-                <div className="mt-6 h-10 w-full rounded-lg bg-blue-600 opacity-80" />
+                  <button
+                    onClick={() =>
+                      (window.location.href = user ? '/post-ad' : '/login')
+                    }
+                    className="block w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                  >
+                    Advertise with us
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              // Fallback skeleton if no ads yet
+              <div className="h-64 rounded-2xl bg-gray-100 animate-pulse" />
+            )}
           </div>
+
         </div>
       </div>
     </section>
   )
-  
 }

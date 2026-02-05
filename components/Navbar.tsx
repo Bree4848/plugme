@@ -4,24 +4,70 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
-const ADMIN_EMAILS = ['admin@plugme.co.za'] // change if needed
-
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
-  const isAdmin =
-    user && ADMIN_EMAILS.includes(user.email ?? '')
+
+  const handleLogout = async () => {
+  await supabase.auth.signOut()
+  window.location.href = '/'
+}
+
+useEffect(() => {
+  if (!isAdmin) return
+
+  const fetchUnreadCount = async () => {
+    const { count } = await supabase
+      .from('contact_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_read', false)
+
+    setUnreadCount(count || 0)
+  }
+
+  fetchUnreadCount()
+}, [isAdmin])
+ 
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-    })
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      setUser(user)
+
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        setIsAdmin(data?.role === 'admin')
+      }
+    }
+
+    loadUser()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      setIsAdmin(false)
+      if (session?.user) {
+        supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => {
+            setIsAdmin(data?.role === 'admin')
+          })
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -34,144 +80,204 @@ export default function Navbar() {
 
   return (
     <header className="bg-white border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link
-            href="/"
-            className="text-xl font-bold text-gray-900"
-          >
-            Plug<span className="text-blue-600">Me</span>
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        {/* Logo */}
+        <Link href="/" className="text-xl font-bold">
+          Plug<span className="text-blue-600">Me</span>
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="hidden lg:flex items-center gap-6">
+          <Link href="/businesses" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            Businesses
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-8">
-            <Link
-              href="/listings"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
-            >
-              Listings
+          <Link href="/about" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            About
+          </Link>
+
+          <Link href="/contact" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            Contact
+          </Link>
+
+
+          {user && (
+            <Link href="/dashboard" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+              Dashboard
             </Link>
+          )}
 
-            {user && (
-              <Link
-                href="/dashboard"
-                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
-              >
-                Dashboard
+         {isAdmin && (
+  <>
+    <Link
+      href="/admin"
+      className="text-sm font-semibold text-red-600 hover:text-blue-600 transition-colors duration-200"
+    >
+      Admin
+    </Link>
+
+    <Link
+  href="/admin/messages"
+  className="relative text-sm font-semibold text-red-600 hover:text-blue-600 transition-colors duration-200"
+>
+  Messages
+
+  {unreadCount > 0 && (
+    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
+      {unreadCount}
+    </span>
+  )}
+</Link>
+<Link href="/admin/logs" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+  Logs
+</Link>
+
+
+  </>
+)}
+
+        </nav>
+
+        {/* Desktop auth */}
+        <div className="hidden lg:flex items-center gap-4">
+          {!user ? (
+            <>
+              <Link href="/login" className="text-sm text-gray-600">
+                Login
               </Link>
-            )}
-
-            {isAdmin && (
               <Link
-                href="/admin"
-                className="text-sm font-semibold text-red-600 hover:text-red-700"
+                href="/register"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold"
               >
-                Admin
+                Get Started
               </Link>
-            )}
-          </nav>
-
-          {/* Desktop Actions */}
-          <div className="hidden lg:flex items-center gap-4">
-            {!user ? (
-              <>
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-gray-600 hover:text-gray-900"
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/register"
-                  className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
-                >
-                  Get Started
-                </Link>
-              </>
-            ) : (
-              <button
-                onClick={logout}
-                className="text-sm font-medium text-gray-500 hover:text-red-600 transition"
-              >
-                Logout
-              </button>
-            )}
-          </div>
-
-          {/* Mobile / Tablet Menu Button */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="lg:hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 transition"
-            aria-label="Toggle menu"
-          >
-            ☰
-          </button>
+            </>
+          ) : (
+            <button onClick={logout} className="text-sm text-gray-500 hover:text-blue-600 transition-colors duration-200">
+              Logout
+            </button>
+          )}
         </div>
+
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="lg:hidden text-gray-600"
+        >
+          ☰
+        </button>
       </div>
 
-      {/* Mobile & Tablet Menu */}
+      {/* Mobile menu */}
       {menuOpen && (
-        <div className="lg:hidden border-t bg-white">
-          <div className="px-4 py-6 space-y-4">
-            <Link
-              href="/listings"
-              onClick={() => setMenuOpen(false)}
-              className="block text-base font-medium text-gray-700"
-            >
-              Listings
-            </Link>
+  <div className="md:hidden absolute top-full left-0 w-full bg-white border-t shadow-lg z-50">
+    <nav className="flex flex-col divide-y">
+      <Link
+        href="/"
+        onClick={() => setMenuOpen(false)}
+        className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200"
+      >
+        Home
+      </Link>
 
-            {user && (
-              <Link
-                href="/dashboard"
-                onClick={() => setMenuOpen(false)}
-                className="block text-base font-medium text-gray-700"
-              >
-                Dashboard
-              </Link>
-            )}
+      <Link
+        href="/businesses"
+        onClick={() => setMenuOpen(false)}
+        className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
+         Businesses
+      </Link>
+      <Link
+        href="/about"
+        onClick={() => setMenuOpen(false)}
+        className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            About
+      </Link>
 
-            {isAdmin && (
-              <Link
-                href="/admin"
-                onClick={() => setMenuOpen(false)}
-                className="block text-base font-semibold text-red-600"
-              >
-                Admin
-              </Link>
-            )}
+     <Link
+       href="/contact"
+       onClick={() => setMenuOpen(false)}
+       className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
+        Contact
+     </Link>
 
-            <div className="pt-4 border-t">
-              {!user ? (
-                <>
-                  <Link
-                    href="/login"
-                    onClick={() => setMenuOpen(false)}
-                    className="block text-gray-700 mb-3"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/register"
-                    onClick={() => setMenuOpen(false)}
-                    className="block rounded-lg bg-blue-600 py-2 text-center font-semibold text-white"
-                  >
-                    Get Started
-                  </Link>
-                </>
-              ) : (
-                <button
-                  onClick={logout}
-                  className="block w-full text-left font-medium text-red-600"
-                >
-                  Logout
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+
+      {!user && (
+        <>
+          <Link
+            href="/login"
+            onClick={() => setMenuOpen(false)}
+            className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            Login
+          </Link>
+
+          <Link
+            href="/register"
+            onClick={() => setMenuOpen(false)}
+            className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            Register
+          </Link>
+        </>
       )}
+
+      {user && (
+        <>
+          <Link
+            href="/dashboard"
+            onClick={() => setMenuOpen(false)}
+            className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            Dashboard
+          </Link>
+
+
+
+      
+        </>
+      )}
+      {isAdmin && (
+  <>
+    <Link
+      href="/admin"
+      onClick={() => setMenuOpen(false)}
+      className="px-6 py-4 text-base font-medium text-red-600 hover:text-blue-600 transition-colors duration-200"
+    >
+      Admin
+    </Link>
+    <Link
+  href="/admin/logs"
+  onClick={() => setMenuOpen(false)}
+  className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200"
+>
+  Logs
+</Link>
+
+
+    <Link
+  href="/admin/messages"
+  onClick={() => setMenuOpen(false)}
+  className="flex items-center justify-between px-6 py-4 text-base font-medium text-red-600 hover:text-blue-600 transition-colors duration-200"
+>
+  <span>Messages</span>
+
+  {unreadCount > 0 && (
+    <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
+      {unreadCount}
+    </span>
+  )}
+</Link>
+
+
+        <button
+            onClick={handleLogout}
+            className="px-6 py-4 text-left text-base font-medium text-red-600 hover:bg-red-50">
+            Logout
+          </button>
+  </>
+)}
+
+    </nav>
+  </div>
+)}
+
     </header>
   )
 }
