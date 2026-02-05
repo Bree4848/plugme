@@ -2,11 +2,14 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function HomePage() {
-  const [ad, setAd] = useState<any>(null)
+  const router = useRouter()
+  const [ads, setAds] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   // Get logged-in user
   useEffect(() => {
@@ -15,35 +18,42 @@ export default function HomePage() {
     })
   }, [])
 
-  // Fetch latest approved ad
+  // Fetch registered businesses
   useEffect(() => {
-    const fetchLatestAd = async () => {
+    const fetchBusinesses = async () => {
       const { data, error } = await supabase
-        .from('ads')
+        .from('businesses')
         .select('*')
-        .eq('approved', true)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle() // ✅ IMPORTANT: avoids crash if no ads
 
-      if (!error) {
-        setAd(data)
+      if (!error && data) {
+        setAds(data)
       }
     }
 
-    fetchLatestAd()
+    fetchBusinesses()
   }, [])
 
-  // Prepare media URL safely
-  let publicUrl: string | null = null
+  // Auto-rotate carousel every 5 seconds
+  useEffect(() => {
+    if (ads.length === 0) return
 
-  if (ad?.media_url) {
-    const { data } = supabase.storage
-      .from('ads')
-      .getPublicUrl(ad.media_url)
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % ads.length)
+    }, 5000)
 
-    publicUrl = data?.publicUrl ?? null
+    return () => clearInterval(interval)
+  }, [ads])
+
+  const goToPrevious = () => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + ads.length) % ads.length)
   }
+
+  const goToNext = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % ads.length)
+  }
+
+  const currentBusiness = ads[currentIndex]
 
   return (
     <section className="relative bg-white">
@@ -75,66 +85,102 @@ export default function HomePage() {
                 Browse Businesses
               </Link>
 
-              <Link
-                href="/post-business"
+              <button
+                onClick={() => {
+                  if (user) {
+                    router.push('/post-business')
+                  } else {
+                    router.push('/login')
+                  }
+                }}
                 className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
               >
                 Post Your Business
-              </Link>
+              </button>
             </div>
           </div>
 
-          {/* RIGHT: AD CARD (OPTIONAL) */}
+          {/* RIGHT: BUSINESSES SLIDER */}
           <div className="relative">
-            {ad && publicUrl ? (
+            {ads.length > 0 && currentBusiness ? (
               <div className="overflow-hidden rounded-2xl border bg-white shadow-lg">
-
                 {/* IMAGE */}
-                {ad.media_type?.startsWith('image/') && (
+                {currentBusiness.image_url ? (
                   <img
-                    src={publicUrl}
-                    alt={ad.title}
+                    src={currentBusiness.image_url}
+                    alt={currentBusiness.name}
                     className="h-64 w-full object-cover"
                   />
+                ) : (
+                  <div className="h-64 w-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-400">No image</span>
+                  </div>
                 )}
 
-                {/* VIDEO */}
-                {ad.media_type?.startsWith('video/') && (
-                  <video
-                    src={publicUrl}
-                    className="h-64 w-full object-cover"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                  />
-                )}
-
-                <div className="p-4 space-y-3">
+                {/* CONTENT */}
+                <div className="p-6 space-y-4">
                   <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {ad.title}
+                    <h3 className="font-semibold text-lg text-gray-900">
+                      {currentBusiness.name}
                     </h3>
-                    <p className="text-xs text-gray-500">
-                      {new Date(ad.created_at).toLocaleString(undefined, {
-                        timeZoneName: 'short',
-                      })}
+                    <p className="text-sm text-gray-500 mt-1">
+                      {currentBusiness.category}
                     </p>
                   </div>
 
-                  <button
-                    onClick={() =>
-                      (window.location.href = user ? '/post-ad' : '/login')
-                    }
-                    className="block w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                  <p className="text-gray-600 text-sm line-clamp-3">
+                    {currentBusiness.description}
+                  </p>
+
+                  {/* VIEW BUTTON */}
+                  <Link
+                    href={`/ads/${currentBusiness.id}`}
+                    className="inline-block w-full text-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
                   >
-                    Advertise with us
-                  </button>
+                    View Business
+                  </Link>
                 </div>
+
+                {/* NAVIGATION BUTTONS */}
+                {ads.length > 1 && (
+                  <div className="flex items-center justify-between px-4 pb-4 gap-2">
+                    <button
+                      onClick={goToPrevious}
+                      className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
+                      aria-label="Previous business"
+                    >
+                      ←
+                    </button>
+
+                    {/* DOTS INDICATOR */}
+                    <div className="flex gap-2 justify-center flex-1">
+                      {ads.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentIndex(index)}
+                          className={`w-2 h-2 rounded-full transition ${
+                            index === currentIndex
+                              ? 'bg-blue-600'
+                              : 'bg-gray-300'
+                          }`}
+                          aria-label={`Go to business ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={goToNext}
+                      className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
+                      aria-label="Next business"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              // Fallback skeleton if no ads yet
-              <div className="h-64 rounded-2xl bg-gray-100 animate-pulse" />
+              // Fallback skeleton if no businesses yet
+              <div className="h-96 rounded-2xl bg-gray-100 animate-pulse" />
             )}
           </div>
 

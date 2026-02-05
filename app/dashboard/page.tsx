@@ -7,10 +7,14 @@ import { supabase } from '@/lib/supabaseClient'
 
 type Ad = {
   id: string
-  title: string
+  name: string
   description: string
-  status: string
+  status?: string
   image_url: string | null
+  category?: string
+  contact_person?: string
+  phone?: string
+  email?: string
 }
 
 export default function DashboardPage() {
@@ -30,7 +34,7 @@ export default function DashboardPage() {
       }
 
       const { data, error } = await supabase
-        .from('ads')
+        .from('businesses')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -97,7 +101,7 @@ export default function DashboardPage() {
                 {ad.image_url && (
                   <img
                     src={ad.image_url}
-                    alt={ad.title}
+                    alt={ad.name}
                     className="w-full h-40 object-cover"
                   />
                 )}
@@ -105,7 +109,7 @@ export default function DashboardPage() {
                 <div className="p-5">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold text-lg">
-                      {ad.title}
+                      {ad.name}
                     </h3>
 
                     <span
@@ -117,7 +121,7 @@ export default function DashboardPage() {
                           : 'bg-yellow-100 text-yellow-700'
                       }`}
                     >
-                      {ad.status}
+                      {ad.status || 'pending'}
                     </span>
                   </div>
 
@@ -126,9 +130,12 @@ export default function DashboardPage() {
                   </p>
 
                   <div className="mt-4 flex gap-3">
-                    <button className="text-blue-600 font-medium text-sm">
+                    <Link
+                      href={`/ads/${ad.id}`}
+                      className="text-blue-600 font-medium text-sm hover:text-blue-700"
+                    >
                       View
-                    </button>
+                    </Link>
 
                     {ad.status === 'pending' && (
                       <button className="text-gray-500 text-sm">

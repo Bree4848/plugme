@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
@@ -21,6 +21,7 @@ export default function PostBusinessPage() {
   })
 
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -67,16 +68,28 @@ export default function PostBusinessPage() {
       imageUrl = data.publicUrl
     }
 
+    const insertPayload: Record<string, any> = {
+      name: form.name,
+      description: form.description,
+      contact_person: form.contact_person,
+      phone: form.phone,
+      email: form.email,
+      image_url: imageUrl,
+      user_id: user.id,
+    }
+
     const { error: insertError } = await supabase
       .from('businesses')
-      .insert({
-        ...form,
-        image_url: imageUrl,
-        user_id: user.id,
-      })
+      .insert(insertPayload)
 
     if (insertError) {
-      setError(insertError.message)
+      console.error('Insert error:', insertError)
+      // Provide a clearer message when the DB schema is missing expected columns
+      if (insertError.message?.includes("Could not find the 'category'")) {
+        setError("Database schema mismatch: 'category' column is missing. Please contact the administrator.")
+      } else {
+        setError(insertError.message)
+      }
     } else {
       setSuccess(true)
       setForm({
@@ -88,6 +101,7 @@ export default function PostBusinessPage() {
         email: '',
       })
       setImageFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(false), 5000)
     }
@@ -208,9 +222,9 @@ export default function PostBusinessPage() {
               Business image
             </label>
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
-              value={imageFile ? undefined : ''}
               onChange={(e) =>
                 setImageFile(e.target.files?.[0] ?? null)
               }
