@@ -88,6 +88,10 @@ useEffect(() => {
 
         {/* Desktop nav */}
         <nav className="hidden lg:flex items-center gap-6">
+          <Link href="/" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            Home
+          </Link>
+
           <Link href="/businesses" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
             Businesses
           </Link>
