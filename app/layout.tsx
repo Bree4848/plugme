@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CookieBanner from '@/components/CookieBanner'
+import AuthListener from '@/components/AuthListener' // Import it here
 
 
 
@@ -36,7 +37,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
-
+        <AuthListener /> {/* It lives here globally */}
         <CookieBanner />
       </body>
     </html>
