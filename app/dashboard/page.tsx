@@ -56,6 +56,34 @@ export default function DashboardPage() {
       </div>
     )
   }
+  async function deleteBusiness(ad: Ad) { // Now we pass the whole 'ad' object
+  const confirmed = window.confirm(`Are you sure you want to delete "${ad.name}"?`);
+  if (!confirmed) return;
+
+  // 1. Storage Cleanup
+  if (ad.image_url) {
+    const urlParts = ad.image_url.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+
+    // Remove file from the bucket
+    await supabase.storage
+      .from('business-images')
+      .remove([fileName]);
+  }
+
+  // 2. Database Cleanup
+  const { error } = await supabase
+    .from('businesses')
+    .delete()
+    .eq('id', ad.id);
+
+  if (!error) {
+    setAds(ads.filter(item => item.id !== ad.id));
+    // You could also trigger a Toast here instead of an alert!
+  } else {
+    alert("Error: " + error.message);
+  }
+}
 
   return (
     <div className="min-h-screen bg-gray-100 px-4 py-8">
@@ -93,60 +121,52 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {ads.map(ad => (
-              <div
-                key={ad.id}
-                className="bg-white rounded-2xl shadow-sm overflow-hidden"
-              >
-                {ad.image_url && (
-                  <img
-                    src={ad.image_url}
-                    alt={ad.name}
-                    className="w-full h-40 object-cover"
-                  />
-                )}
+  {ads.map(ad => (
+    <div key={ad.id} className="bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
+      {ad.image_url && (
+        <img src={ad.image_url} alt={ad.name} className="w-full h-40 object-cover" />
+      )}
 
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-lg">
-                      {ad.name}
-                    </h3>
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-lg">{ad.name}</h3>
+          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+            ad.status === 'approved' ? 'bg-green-100 text-green-700' : 
+            ad.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+          }`}>
+            {ad.status || 'pending'}
+          </span>
+        </div>
 
-                    <span
-                      className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                        ad.status === 'approved'
-                          ? 'bg-green-100 text-green-700'
-                          : ad.status === 'rejected'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {ad.status || 'pending'}
-                    </span>
-                  </div>
+        <p className="text-gray-600 text-sm line-clamp-2 mb-4">{ad.description}</p>
 
-                  <p className="text-gray-600 text-sm line-clamp-3">
-                    {ad.description}
-                  </p>
+        {/* ACTIONS SECTION */}
+        <div className="mt-auto pt-4 border-t flex flex-wrap gap-3">
+          <Link
+            href={`/business/${ad.id}`} // Fixed path
+            className="text-blue-600 font-medium text-sm hover:underline"
+          >
+            View
+          </Link>
 
-                  <div className="mt-4 flex gap-3">
-                    <Link
-                      href={`/ads/${ad.id}`}
-                      className="text-blue-600 font-medium text-sm hover:text-blue-700"
-                    >
-                      View
-                    </Link>
+          <Link
+            href={`/edit-business/${ad.id}`} // New Edit path
+            className="text-amber-600 font-medium text-sm hover:underline"
+          >
+            Update
+          </Link>
 
-                    {ad.status === 'pending' && (
-                      <button className="text-gray-500 text-sm">
-                        Awaiting approval
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <button 
+            onClick={() => deleteBusiness(ad)} // After: passing the whole 'ad' object
+            className="text-red-600 font-medium text-sm hover:underline"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
         )}
       </div>
     </div>

@@ -10,6 +10,7 @@ export default function PostBusinessPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: '',
@@ -225,12 +226,44 @@ export default function PostBusinessPage() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) =>
-                setImageFile(e.target.files?.[0] ?? null)
-              }
-              className="mt-1 block w-full text-sm"
-            />
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                setImageFile(file)
+    
+                if (file) {
+                  // Create a temporary URL for the selected file
+                  const url = URL.createObjectURL(file)
+                  setPreviewUrl(url)
+                } else {
+                  setPreviewUrl(null)
+               }
+              }}
+            className="mt-1 block w-full text-sm"
+          />
           </div>
+          
+          {/* Image preview */}
+          {previewUrl && (
+          <div className="mt-4">
+            <p className="text-sm font-medium text-gray-700 mb-2">Image Preview:</p>
+            <img 
+              src={previewUrl} 
+              alt="Preview" 
+              className="h-48 w-full object-cover rounded-lg border shadow-sm" 
+            />
+          <button
+            type="button"
+            onClick={() => {
+              setImageFile(null)
+              setPreviewUrl(null)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+         }}
+          className="mt-2 text-xs text-red-600 hover:underline"
+          >
+           Remove image
+         </button>
+      </div>
+      )}
 
           <button
             type="submit"

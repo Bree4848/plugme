@@ -114,7 +114,7 @@ export default function BusinessesPage() {
               </p>
 
               <Link
-                href={`/businesses/${b.id}`}
+                href={`/business/${b.id}`}
                 className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline"
               >
                 View Business →
