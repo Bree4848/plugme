@@ -125,7 +125,7 @@ export default function DashboardPage() {
                       href={`/edit-business/${ad.id}`} 
                       className="text-sm font-medium text-amber-600 hover:text-amber-700"
                     >
-                      Update
+                      Update 
                     </Link>
                     <button 
                       onClick={() => handleDelete(ad)}
