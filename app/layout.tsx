@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CookieBanner from '@/components/CookieBanner'
 import AuthListener from '@/components/AuthListener' // Import it here
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 
 
@@ -30,8 +31,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="bg-gray-50 text-gray-900">
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors">
+
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {children}
@@ -39,6 +42,7 @@ export default function RootLayout({
         <Footer />
         <AuthListener /> {/* It lives here globally */}
         <CookieBanner />
+        </ThemeProvider>
       </body>
     </html>
   );

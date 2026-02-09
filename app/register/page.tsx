@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link' // Added Link import
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -10,6 +11,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   async function handleRegister(e: React.FormEvent) {
@@ -22,8 +24,9 @@ export default function RegisterPage() {
 
     setLoading(true)
     setError(null)
+    setSuccessMessage(null)
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     })
@@ -31,7 +34,12 @@ export default function RegisterPage() {
     if (error) {
       setError(error.message)
     } else {
-      router.push('/')
+      // Check if user needs to confirm email or is logged in immediately
+      if (data.user && data.session === null) {
+        setSuccessMessage('Check your email for a confirmation link!')
+      } else {
+        router.push('/')
+      }
     }
 
     setLoading(false)
@@ -51,6 +59,12 @@ export default function RegisterPage() {
           {error && (
             <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
               {error}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-600">
+              {successMessage}
             </div>
           )}
 
@@ -101,6 +115,19 @@ export default function RegisterPage() {
             {loading ? 'Creating account...' : 'Register'}
           </button>
         </form>
+
+        {/* --- Redirect to Login Section --- */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link 
+              href="/login" 
+              className="font-medium text-blue-600 hover:text-blue-500 hover:underline"
+            >
+              Log in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   )
