@@ -1,288 +1,140 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+type Business = {
+  id: string
+  name: string
+  status: string
+  category: string
+}
+
+type Profile = {
+  id: string
+  email: string
+  role: string
+}
+
 export default function AdminPage() {
-  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'businesses' | 'users'>('businesses')
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [businesses, setBusinesses] = useState<any[]>([])
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-const [message, setMessage] = useState<string | null>(null)
-
-  async function updateStatus(id: string, status: string) {
-  setActionLoading(id)
-  setMessage(null)
-
-  const { error } = await supabase
-    .from('businesses')
-    .update({ status })
-    .eq('id', id)
-
-  if (error) {
-    setMessage('Something went wrong. Please try again.')
-  } else {
-    setBusinesses((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, status } : b
-      )
-    )
-    setMessage(`Business ${status} successfully.`)
-  }
-
-  setActionLoading(null)
-}
-
-async function deleteBusiness(id: string) {
-  const confirmed = window.confirm(
-    'Are you sure you want to permanently delete this business?'
-  )
-
-  if (!confirmed) return
-
-  setActionLoading(id)
-  setMessage(null)
-
-  const { error } = await supabase
-    .from('businesses')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    setMessage('Failed to delete business.')
-  } else {
-    setBusinesses((prev) => prev.filter((b) => b.id !== id))
-    setMessage('Business deleted successfully.')
-  }
-
-  setActionLoading(null)
-}
-
 
   useEffect(() => {
-    async function checkAdmin() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    fetchData()
+  }, [activeTab])
 
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role !== 'admin') {
-        router.push('/')
-        return
-      }
-
-      setIsAdmin(true)
-
-      const { data: businesses } = await supabase
-        .from('businesses')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      setBusinesses(businesses || [])
-      setLoading(false)
+  async function fetchData() {
+    setLoading(true)
+    if (activeTab === 'businesses') {
+      const { data } = await supabase.from('businesses').select('*').order('created_at', { ascending: false })
+      setBusinesses(data || [])
+    } else {
+      const { data } = await supabase.from('profiles').select('*').order('email', { ascending: true })
+      setProfiles(data || [])
     }
-
-    checkAdmin()
-  }, [router])
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20 text-gray-500">
-        Loading admin dashboard...
-      </div>
-    )
+    setLoading(false)
   }
 
-  if (!isAdmin) return null
+  // --- Business Actions ---
+  async function updateBusinessStatus(id: string, newStatus: string) {
+    await supabase.from('businesses').update({ status: newStatus }).eq('id', id)
+    fetchData()
+  }
+
+  // --- User Role Actions ---
+  async function toggleUserRole(id: string, currentRole: string) {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin'
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', id)
+    
+    if (error) alert("Error updating role: " + error.message)
+    else fetchData()
+  }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Admin Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Manage businesses and monitor platform activity
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto px-6 py-10">
+      <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-gray-500">Total Businesses</p>
-          <p className="mt-2 text-2xl font-bold">
-            {businesses.length}
-          </p>
-        </div>
-
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-gray-500">Admins</p>
-          <p className="mt-2 text-2xl font-bold">1</p>
-        </div>
-
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-sm text-gray-500">Platform Status</p>
-          <p className="mt-2 text-sm font-semibold text-green-600">
-            Active
-          </p>
-        </div>
-      </div>
-      {message && (
-  <div className="rounded-lg border bg-green-50 px-4 py-3 text-sm text-green-700">
-    {message}
-  </div>
-)}
-
-      {/* Businesses Table */}
-      <div className="rounded-xl border bg-white">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold">
-            Registered Businesses
-          </h2>
-        </div>
-
-        {/* Desktop / Tablet Table */}
-<div className="hidden md:block overflow-x-auto">
-
-          <table className="w-full text-sm">
-  <thead className="bg-gray-50 text-left text-gray-600">
-    <tr>
-      <th className="px-5 py-3">Name</th>
-      <th className="px-5 py-3">Category</th>
-      <th className="px-5 py-3">Status</th>
-      <th className="px-5 py-3">Actions</th>
-    </tr>
-  </thead>
-
-  <tbody>
-    {businesses.map((b) => (
-      <tr key={b.id} className="border-t">
-        <td className="px-5 py-3">{b.name}</td>
-        <td className="px-5 py-3">{b.category}</td>
-        <td className="px-5 py-3">{b.status}</td>
-        <td className="px-5 py-3 space-x-2">
-  {b.status !== 'approved' && (
-    <button
-      disabled={actionLoading === b.id}
-      onClick={() => updateStatus(b.id, 'approved')}
-      className="rounded bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-    >
-      {actionLoading === b.id ? '...' : 'Approve'}
-    </button>
-  )}
-
-  {b.status !== 'rejected' && (
-    <button
-      disabled={actionLoading === b.id}
-      onClick={() => updateStatus(b.id, 'rejected')}
-      className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-    >
-      {actionLoading === b.id ? '...' : 'Reject'}
-    </button>
-  )}
-
-  {b.status !== 'approved' && (
-    <button
-  disabled={actionLoading === b.id}
-  onClick={() => deleteBusiness(b.id)}
-  className="rounded bg-gray-800 px-3 py-1 text-xs font-semibold text-white hover:bg-black disabled:opacity-50"
->
-  {actionLoading === b.id ? '...' : 'Delete'}
-</button>
-
-)}
-
-</td>
-
-      </tr>
-    ))}
-  </tbody>
-</table>
-{/* Mobile Card View */}
-
-
-
-        </div>
-        <div className="space-y-4 md:hidden">
-  {businesses.map((b) => (
-    <div
-      key={b.id}
-      className="rounded-xl border bg-white p-4 space-y-3"
-    >
-      <div>
-        <p className="text-xs text-gray-500">Business</p>
-        <p className="font-semibold">{b.name}</p>
-      </div>
-
-      <div className="flex justify-between">
-        <span className="text-sm text-gray-600">
-          {b.category}
-        </span>
-
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            b.status === 'approved'
-              ? 'bg-green-100 text-green-700'
-              : b.status === 'rejected'
-              ? 'bg-red-100 text-red-700'
-              : 'bg-yellow-100 text-yellow-700'
-          }`}
+      {/* Tab Switcher */}
+      <div className="flex border-b mb-6">
+        <button 
+          onClick={() => setActiveTab('businesses')}
+          className={`px-6 py-2 font-medium ${activeTab === 'businesses' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
         >
-          {b.status}
-        </span>
-      </div>
-
-      <div className="flex gap-2 pt-2">
-        {b.status !== 'approved' && (
-          <button
-            disabled={actionLoading === b.id}
-            onClick={() => updateStatus(b.id, 'approved')}
-            className="flex-1 rounded bg-green-600 py-2 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            Approve
-          </button>
-        )}
-
-        {b.status !== 'rejected' && (
-          <button
-            disabled={actionLoading === b.id}
-            onClick={() => updateStatus(b.id, 'rejected')}
-            className="flex-1 rounded bg-red-600 py-2 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            Reject
-          </button>
-        )}
-
-        <button
-          disabled={actionLoading === b.id}
-          onClick={() => deleteBusiness(b.id)}
-          className="flex-1 rounded bg-gray-800 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          Manage Businesses
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')}
+          className={`px-6 py-2 font-medium ${activeTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
         >
-          Delete
+          Manage Users
         </button>
       </div>
-    </div>
-  ))}
 
-  {businesses.length === 0 && (
-    <p className="text-center text-sm text-gray-500">
-      No businesses found
-    </p>
-  )}
-</div>
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        {activeTab === 'businesses' ? (
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-6 py-3">Business</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {businesses.map(b => (
+                <tr key={b.id}>
+                  <td className="px-6 py-4 font-medium">{b.name}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${b.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      {b.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => updateBusinessStatus(b.id, b.status === 'approved' ? 'pending' : 'approved')}
+                      className="text-xs text-blue-600 font-bold"
+                    >
+                      {b.status === 'approved' ? 'Reject' : 'Approve'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-6 py-3">Email</th>
+                <th className="px-6 py-3">Current Role</th>
+                <th className="px-6 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {profiles.map(p => (
+                <tr key={p.id}>
+                  <td className="px-6 py-4">{p.email}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${p.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                      {p.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => toggleUserRole(p.id, p.role)}
+                      className="text-xs bg-gray-100 px-3 py-1.5 rounded font-medium hover:bg-gray-200"
+                    >
+                      Change to {p.role === 'admin' ? 'User' : 'Admin'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

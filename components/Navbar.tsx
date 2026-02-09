@@ -10,72 +10,90 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
-
-  const handleLogout = async () => {
-  await supabase.auth.signOut()
-  window.location.href = '/'
-}
-
-useEffect(() => {
-  if (!isAdmin) return
-
-  const fetchUnreadCount = async () => {
+  // 1. Helper function to fetch the count
+  async function fetchUnreadCount() {
     const { count } = await supabase
       .from('contact_messages')
       .select('*', { count: 'exact', head: true })
       .eq('is_read', false)
-
+    
     setUnreadCount(count || 0)
   }
 
-  fetchUnreadCount()
-}, [isAdmin])
- 
-
   useEffect(() => {
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    let messageChannel: any; // 2. Variable to hold the realtime subscription
 
+    async function loadUserAndRole() {
+      const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
 
       if (user) {
-        const { data } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
 
-        setIsAdmin(data?.role === 'admin')
+        if (error) {
+          console.error("Navbar Role Fetch Error:", error.message)
+        }
+
+        const isUserAdmin = profile?.role === 'admin'
+        setIsAdmin(isUserAdmin)
+
+        if (isUserAdmin) {
+          // 3. Initial count fetch
+          fetchUnreadCount()
+
+          // 4. REALTIME SUBSCRIPTION: Listen for deletes or updates
+          messageChannel = supabase
+            .channel('db-changes')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'contact_messages' },
+              () => {
+                fetchUnreadCount() // Recount when any message is deleted/changed
+              }
+            )
+            .subscribe()
+        }
       }
     }
 
-    loadUser()
+    loadUserAndRole()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setIsAdmin(false)
-      if (session?.user) {
-        supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+      
+      if (currentUser) {
+        const { data } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            setIsAdmin(data?.role === 'admin')
-          })
+          .eq('id', currentUser.id)
+          .maybeSingle()
+        
+        const isUserAdmin = data?.role === 'admin'
+        setIsAdmin(isUserAdmin)
+        
+        if (isUserAdmin) fetchUnreadCount()
+      } else {
+        setIsAdmin(false)
+        setUnreadCount(0)
       }
     })
 
-    return () => subscription.unsubscribe()
+    // 5. Cleanup both the Auth listener and the Realtime channel
+    return () => {
+      subscription.unsubscribe()
+      if (messageChannel) supabase.removeChannel(messageChannel)
+    }
   }, [])
 
-  async function logout() {
+  const logout = async () => {
     await supabase.auth.signOut()
     setMenuOpen(false)
+    window.location.href = '/'
   }
 
   return (
@@ -88,58 +106,47 @@ useEffect(() => {
 
         {/* Desktop nav */}
         <nav className="hidden lg:flex items-center gap-6">
-          <Link href="/" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+          <Link href="/" className="text-sm text-gray-600 hover:text-blue-600">
             Home
           </Link>
 
-          <Link href="/businesses" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+          <Link href="/businesses" className="text-sm text-gray-600 hover:text-blue-600">
             Businesses
           </Link>
 
-          <Link href="/about" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+          <Link href="/about" className="text-sm text-gray-600 hover:text-blue-600">
             About
           </Link>
 
-          <Link href="/contact" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+          <Link href="/contact" className="text-sm text-gray-600 hover:text-blue-600">
             Contact
           </Link>
 
-
           {user && (
-            <Link href="/dashboard" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            <Link href="/dashboard" className="text-sm text-gray-600 hover:text-blue-600">
               Dashboard
             </Link>
           )}
 
-         {isAdmin && (
-  <>
-    <Link
-      href="/admin"
-      className="text-sm font-semibold text-red-600 hover:text-blue-600 transition-colors duration-200"
-    >
-      Admin
-    </Link>
-
-    <Link
-  href="/admin/messages"
-  className="relative text-sm font-semibold text-red-600 hover:text-blue-600 transition-colors duration-200"
->
-  Messages
-
-  {unreadCount > 0 && (
-    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
-      {unreadCount}
-    </span>
-  )}
-</Link>
-<Link href="/admin/logs" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">
-  Logs
-</Link>
-
-
-  </>
-)}
-
+          {isAdmin && (
+            <>
+              <div className="h-6 w-[1px] bg-gray-200 mx-2" />
+              <Link href="/admin" className="text-sm font-bold text-red-600 hover:text-red-700">
+                Admin
+              </Link>
+              <Link href="/admin/messages" className="relative text-sm font-semibold text-gray-700 hover:text-blue-600">
+                Messages
+                {unreadCount > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-[10px] text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+              <Link href="/admin/logs" className="text-sm text-gray-600 hover:text-blue-600">
+                Logs
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Desktop auth */}
@@ -157,7 +164,7 @@ useEffect(() => {
               </Link>
             </>
           ) : (
-            <button onClick={logout} className="text-sm text-gray-500 hover:text-blue-600 transition-colors duration-200">
+            <button onClick={logout} className="text-sm text-gray-500 hover:text-blue-600 font-medium">
               Logout
             </button>
           )}
@@ -166,7 +173,7 @@ useEffect(() => {
         {/* Mobile menu button */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="lg:hidden text-gray-600"
+          className="lg:hidden text-gray-600 text-2xl"
         >
           ☰
         </button>
@@ -174,114 +181,41 @@ useEffect(() => {
 
       {/* Mobile menu */}
       {menuOpen && (
-  <div className="md:hidden absolute top-full left-0 w-full bg-white border-t shadow-lg z-50">
-    <nav className="flex flex-col divide-y">
-      <Link
-        href="/"
-        onClick={() => setMenuOpen(false)}
-        className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200"
-      >
-        Home
-      </Link>
-
-      <Link
-        href="/businesses"
-        onClick={() => setMenuOpen(false)}
-        className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
-         Businesses
-      </Link>
-      <Link
-        href="/about"
-        onClick={() => setMenuOpen(false)}
-        className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
-            About
-      </Link>
-
-     <Link
-       href="/contact"
-       onClick={() => setMenuOpen(false)}
-       className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
-        Contact
-     </Link>
-
-
-      {!user && (
-        <>
-          <Link
-            href="/login"
-            onClick={() => setMenuOpen(false)}
-            className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
-            Login
-          </Link>
-
-          <Link
-            href="/register"
-            onClick={() => setMenuOpen(false)}
-            className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
-            Register
-          </Link>
-        </>
+        <div className="lg:hidden absolute top-full left-0 w-full bg-white border-t shadow-lg z-50">
+          <nav className="flex flex-col divide-y">
+            <Link href="/" onClick={() => setMenuOpen(false)} className="px-6 py-4">
+              Home
+            </Link>
+            <Link href="/businesses" onClick={() => setMenuOpen(false)} className="px-6 py-4">
+              Businesses
+            </Link>
+            {isAdmin && (
+              <>
+                <Link href="/admin" onClick={() => setMenuOpen(false)} className="px-6 py-4 text-red-600 font-bold">
+                  Admin Panel
+                </Link>
+                <Link href="/admin/messages" onClick={() => setMenuOpen(false)} className="px-6 py-4 flex justify-between">
+                   <span>Messages</span>
+                   {unreadCount > 0 && (
+                     <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-xs">
+                       {unreadCount}
+                     </span>
+                   )}
+                </Link>
+              </>
+            )}
+            {user ? (
+              <button onClick={logout} className="px-6 py-4 text-left text-red-600">
+                Logout
+              </button>
+            ) : (
+              <Link href="/login" onClick={() => setMenuOpen(false)} className="px-6 py-4">
+                Login
+              </Link>
+            )}
+          </nav>
+        </div>
       )}
-
-      {user && (
-        <>
-          <Link
-            href="/dashboard"
-            onClick={() => setMenuOpen(false)}
-            className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200">
-            Dashboard
-          </Link>
-
-
-
-      
-        </>
-      )}
-      {isAdmin && (
-  <>
-    <Link
-      href="/admin"
-      onClick={() => setMenuOpen(false)}
-      className="px-6 py-4 text-base font-medium text-red-600 hover:text-blue-600 transition-colors duration-200"
-    >
-      Admin
-    </Link>
-    <Link
-  href="/admin/logs"
-  onClick={() => setMenuOpen(false)}
-  className="px-6 py-4 text-base font-medium text-gray-600 hover:text-blue-600 transition-colors duration-200"
->
-  Logs
-</Link>
-
-
-    <Link
-  href="/admin/messages"
-  onClick={() => setMenuOpen(false)}
-  className="flex items-center justify-between px-6 py-4 text-base font-medium text-red-600 hover:text-blue-600 transition-colors duration-200"
->
-  <span>Messages</span>
-
-  {unreadCount > 0 && (
-    <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
-      {unreadCount}
-    </span>
-  )}
-</Link>
-
-
-        <button
-            onClick={handleLogout}
-            className="px-6 py-4 text-left text-base font-medium text-red-600 hover:bg-red-50">
-            Logout
-          </button>
-  </>
-)}
-
-    </nav>
-  </div>
-)}
-
     </header>
   )
 }

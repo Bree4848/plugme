@@ -36,7 +36,7 @@ export default function AdminLogsPage() {
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setLogs(data)
+      setLogs(data as any[])
     }
 
     setLoading(false)
