@@ -9,7 +9,7 @@ type Business = {
   name: string
   category: string
   description: string
-  location?: string // Added location to type if it exists in your DB
+  location?: string // Added location to type if it exists in your D8
 }
 
 export default function BusinessesPage() {
