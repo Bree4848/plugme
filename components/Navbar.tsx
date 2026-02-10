@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
-import ThemeToggle from './ThemeToggle' // Added import
+import ThemeToggle from './ThemeToggle'
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
@@ -11,7 +11,6 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // 1. Helper function to fetch the count
   async function fetchUnreadCount() {
     const { count } = await supabase
       .from('contact_messages')
@@ -22,7 +21,7 @@ export default function Navbar() {
   }
 
   useEffect(() => {
-    let messageChannel: any; // 2. Variable to hold the realtime subscription
+    let messageChannel: any;
 
     async function loadUserAndRole() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -43,17 +42,15 @@ export default function Navbar() {
         setIsAdmin(isUserAdmin)
 
         if (isUserAdmin) {
-          // 3. Initial count fetch
           fetchUnreadCount()
 
-          // 4. REALTIME SUBSCRIPTION: Listen for deletes or updates
           messageChannel = supabase
             .channel('db-changes')
             .on(
               'postgres_changes',
               { event: '*', schema: 'public', table: 'contact_messages' },
               () => {
-                fetchUnreadCount() // Recount when any message is deleted/changed
+                fetchUnreadCount()
               }
             )
             .subscribe()
@@ -84,7 +81,6 @@ export default function Navbar() {
       }
     })
 
-    // 5. Cleanup both the Auth listener and the Realtime channel
     return () => {
       subscription.unsubscribe()
       if (messageChannel) supabase.removeChannel(messageChannel)
@@ -98,38 +94,31 @@ export default function Navbar() {
   }
 
   return (
-    // Added dark:bg-gray-950 and dark:border-gray-800
     <header className="bg-white dark:bg-gray-900 border-b dark:border-gray-800 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo (Added dark:text-white) */}
         <Link href="/" className="text-xl font-bold dark:text-white">
           Plug<span className="text-blue-600">Me</span>
         </Link>
 
-        {/* Desktop nav (Added dark:text-gray-400) */}
+        {/* Desktop nav */}
         <nav className="hidden lg:flex items-center gap-6">
           <Link href="/" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600">
             Home
           </Link>
-
           <Link href="/businesses" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600">
             Businesses
           </Link>
-
           <Link href="/about" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600">
             About
           </Link>
-
           <Link href="/contact" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600">
             Contact
           </Link>
-
           {user && (
             <Link href="/dashboard" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600">
               Dashboard
             </Link>
           )}
-
           {isAdmin && (
             <>
               <div className="h-6 w-[1px] bg-gray-200 dark:bg-gray-800 mx-2" />
@@ -144,50 +133,34 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
-              <Link href="/admin/logs" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600">
-                Logs
-              </Link>
             </>
           )}
         </nav>
 
-        {/* Desktop auth + ThemeToggle */}
         <div className="hidden lg:flex items-center gap-4">
-          <ThemeToggle /> {/* Added Toggle */}
+          <ThemeToggle />
           {!user ? (
             <>
-              <Link href="/login" className="text-sm text-gray-600 dark:text-gray-400">
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-              >
-                Get Started
-              </Link>
+              <Link href="/login" className="text-sm text-gray-600 dark:text-gray-400">Login</Link>
+              <Link href="/register" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Get Started</Link>
             </>
           ) : (
-            <button onClick={logout} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 font-medium">
-              Logout
-            </button>
+            <button onClick={logout} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 font-medium">Logout</button>
           )}
         </div>
 
-        {/* Mobile menu button (Added dark:text-gray-300 and toggle) */}
+        {/* Mobile menu button */}
         <div className="lg:hidden flex items-center gap-3">
           <ThemeToggle />
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="text-gray-600 dark:text-gray-300 text-2xl"
-          >
-            ☰
+          <button onClick={() => setMenuOpen(!menuOpen)} className="text-gray-600 dark:text-gray-300 text-2xl">
+            {menuOpen ? '✕' : '☰'}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu (Added dark classes) */}
+      {/* Mobile menu - NOW PUSHES CONTENT DOWN */}
       {menuOpen && (
-        <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-950 border-t dark:border-gray-800 shadow-lg z-50">
+        <div className="lg:hidden w-full bg-white dark:bg-gray-950 border-t dark:border-gray-800">
           <nav className="flex flex-col divide-y dark:divide-gray-800">
             <Link href="/" onClick={() => setMenuOpen(false)} className="px-6 py-4 dark:text-gray-300">
               Home
@@ -195,6 +168,11 @@ export default function Navbar() {
             <Link href="/businesses" onClick={() => setMenuOpen(false)} className="px-6 py-4 dark:text-gray-300">
               Businesses
             </Link>
+            {user && (
+              <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="px-6 py-4 dark:text-gray-300 font-medium text-blue-600">
+                Dashboard
+              </Link>
+            )}
             {isAdmin && (
               <>
                 <Link href="/admin" onClick={() => setMenuOpen(false)} className="px-6 py-4 text-red-600 font-bold">
@@ -203,21 +181,15 @@ export default function Navbar() {
                 <Link href="/admin/messages" onClick={() => setMenuOpen(false)} className="px-6 py-4 flex justify-between dark:text-gray-300">
                    <span>Messages</span>
                    {unreadCount > 0 && (
-                     <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-xs">
-                       {unreadCount}
-                     </span>
+                     <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-xs">{unreadCount}</span>
                    )}
                 </Link>
               </>
             )}
             {user ? (
-              <button onClick={logout} className="px-6 py-4 text-left text-red-600">
-                Logout
-              </button>
+              <button onClick={logout} className="px-6 py-4 text-left text-red-600">Logout</button>
             ) : (
-              <Link href="/login" onClick={() => setMenuOpen(false)} className="px-6 py-4 dark:text-gray-300">
-                Login
-              </Link>
+              <Link href="/login" onClick={() => setMenuOpen(false)} className="px-6 py-4 dark:text-gray-300">Login</Link>
             )}
           </nav>
         </div>
