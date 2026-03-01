@@ -71,6 +71,7 @@ export default function PostBusinessPage() {
 
     const insertPayload: Record<string, any> = {
       name: form.name,
+      category: form.category,
       description: form.description,
       contact_person: form.contact_person,
       phone: form.phone,
