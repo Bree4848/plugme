@@ -3,9 +3,11 @@
 import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { useSWRConfig } from 'swr' // 1. Import SWR Config
 
 export default function PostBusinessPage() {
   const router = useRouter()
+  const { mutate } = useSWRConfig() // 2. Initialize mutate
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,79 +38,86 @@ export default function PostBusinessPage() {
     setError(null)
     setSuccess(false)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    if (!user) {
-      setError('You must be logged in')
-      setLoading(false)
-      return
-    }
-
-    let imageUrl = null
-
-    if (imageFile) {
-      const fileExt = imageFile.name.split('.').pop()
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('business-images')
-        .upload(fileName, imageFile)
-
-      if (uploadError) {
-        setError(uploadError.message)
+      if (!user) {
+        setError('You must be logged in')
         setLoading(false)
         return
       }
 
-      const { data } = supabase.storage
-        .from('business-images')
-        .getPublicUrl(fileName)
+      let imageUrl = null
 
-      imageUrl = data.publicUrl
-    }
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop()
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`
 
-    const insertPayload: Record<string, any> = {
-      name: form.name,
-      category: form.category,
-      description: form.description,
-      contact_person: form.contact_person,
-      phone: form.phone,
-      email: form.email,
-      image_url: imageUrl,
-      user_id: user.id,
-    }
+        const { error: uploadError } = await supabase.storage
+          .from('business-images')
+          .upload(fileName, imageFile)
 
-    const { error: insertError } = await supabase
-      .from('businesses')
-      .insert(insertPayload)
+        if (uploadError) {
+          setError(uploadError.message)
+          setLoading(false)
+          return
+        }
 
-    if (insertError) {
-      console.error('Insert error:', insertError)
-      // Provide a clearer message when the DB schema is missing expected columns
-      if (insertError.message?.includes("Could not find the 'category'")) {
-        setError("Database schema mismatch: 'category' column is missing. Please contact the administrator.")
-      } else {
-        setError(insertError.message)
+        const { data } = supabase.storage
+          .from('business-images')
+          .getPublicUrl(fileName)
+
+        imageUrl = data.publicUrl
       }
-    } else {
-      setSuccess(true)
-      setForm({
-        name: '',
-        category: '',
-        description: '',
-        contact_person: '',
-        phone: '',
-        email: '',
-      })
-      setImageFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      // Clear success message after 5 seconds
-      setTimeout(() => setSuccess(false), 5000)
-    }
 
-    setLoading(false)
+      const insertPayload: Record<string, any> = {
+        name: form.name,
+        category: form.category,
+        description: form.description,
+        contact_person: form.contact_person,
+        phone: form.phone,
+        email: form.email,
+        image_url: imageUrl,
+        user_id: user.id,
+      }
+
+      const { error: insertError } = await supabase
+        .from('businesses')
+        .insert(insertPayload)
+
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        if (insertError.message?.includes("Could not find the 'category'")) {
+          setError("Database schema mismatch: 'category' column is missing.")
+        } else {
+          setError(insertError.message)
+        }
+      } else {
+        // 3. REFRESH THE CACHE
+        // This tells SWR to refresh any list that uses 'homepage-businesses'
+        mutate('homepage-businesses') 
+
+        setSuccess(true)
+        setForm({
+          name: '',
+          category: '',
+          description: '',
+          contact_person: '',
+          phone: '',
+          email: '',
+        })
+        setImageFile(null)
+        setPreviewUrl(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        setTimeout(() => setSuccess(false), 5000)
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -232,7 +241,6 @@ export default function PostBusinessPage() {
                 setImageFile(file)
     
                 if (file) {
-                  // Create a temporary URL for the selected file
                   const url = URL.createObjectURL(file)
                   setPreviewUrl(url)
                 } else {
@@ -261,7 +269,7 @@ export default function PostBusinessPage() {
          }}
           className="mt-2 text-xs text-red-600 hover:underline"
           >
-           Remove image
+            Remove image
          </button>
       </div>
       )}
@@ -269,7 +277,7 @@ export default function PostBusinessPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
           >
             {loading ? 'Posting...' : 'Post Business'}
           </button>
