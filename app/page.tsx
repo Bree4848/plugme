@@ -4,36 +4,37 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import useSWR from 'swr' // Ensure you ran: npm install swr
 
 export default function HomePage() {
   const router = useRouter()
+  const [ads, setAds] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  // 1. Get logged-in user (Keep your original logic here)
+  // Get logged-in user
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
     })
   }, [])
 
-  // 2. NEW: Fetch businesses with SWR for stability
-  // This replaces your manual fetchBusinesses useEffect
-  const { data: ads = [], error } = useSWR('homepage-businesses', async () => {
-    const { data, error } = await supabase
-      .from('businesses')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return data
-  }, {
-    revalidateOnFocus: false, // Prevents flicker when switching tabs
-    dedupingInterval: 5000,   // Don't spam the DB if they refresh quickly
-  })
+  // Fetch registered businesses
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-  // 3. Auto-rotate carousel every 5 seconds
+      if (!error && data) {
+        setAds(data)
+      }
+    }
+
+    fetchBusinesses()
+  }, [])
+
+  // Auto-rotate carousel every 5 seconds
   useEffect(() => {
     if (ads.length === 0) return
 
@@ -45,18 +46,13 @@ export default function HomePage() {
   }, [ads])
 
   const goToPrevious = () => {
-    if (ads.length > 0) {
-      setCurrentIndex((prevIndex) => (prevIndex - 1 + ads.length) % ads.length)
-    }
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + ads.length) % ads.length)
   }
 
   const goToNext = () => {
-    if (ads.length > 0) {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % ads.length)
-    }
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % ads.length)
   }
 
-  // Safety check for the current slide
   const currentBusiness = ads[currentIndex]
 
   return (
@@ -64,7 +60,7 @@ export default function HomePage() {
       <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
 
-          {/* LEFT: HERO TEXT (Kept exactly as you provided) */}
+          {/* LEFT: HERO TEXT */}
           <div>
             <span className="inline-block rounded-full bg-blue-50 px-4 py-1 text-sm font-medium text-blue-600">
               Discover • Connect • Grow
@@ -106,7 +102,6 @@ export default function HomePage() {
 
           {/* RIGHT: BUSINESSES SLIDER */}
           <div className="relative">
-            {/* Logic: Only show the card if we have data. Otherwise, show a loading/error skeleton. */}
             {ads.length > 0 && currentBusiness ? (
               <div className="overflow-hidden rounded-2xl border bg-white shadow-lg">
                 {/* IMAGE */}
@@ -159,7 +154,7 @@ export default function HomePage() {
 
                     {/* DOTS INDICATOR */}
                     <div className="flex gap-2 justify-center flex-1">
-                      {ads.map((_, index: number) => (
+                      {ads.map((_, index) => (
                         <button
                           key={index}
                           onClick={() => setCurrentIndex(index)}
@@ -184,14 +179,8 @@ export default function HomePage() {
                 )}
               </div>
             ) : (
-              // FALLBACK: This is shown while loading or if an error occurs
-              <div className="h-96 rounded-2xl bg-gray-100 animate-pulse flex flex-col items-center justify-center border border-dashed">
-                 {error ? (
-                   <span className="text-red-400 text-xs">Connection issue. Retrying...</span>
-                 ) : (
-                   <span className="text-gray-400 text-sm">Loading local businesses...</span>
-                 )}
-              </div>
+              // Fallback skeleton if no businesses yet
+              <div className="h-96 rounded-2xl bg-gray-100 animate-pulse" />
             )}
           </div>
 
