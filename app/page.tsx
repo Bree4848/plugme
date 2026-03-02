@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import AdUnit from '@/components/AdUnit' // 1. Import the Ad component
 
 export default function HomePage() {
   const router = useRouter()
@@ -58,6 +59,10 @@ export default function HomePage() {
   return (
     <section className="relative bg-white">
       <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        
+        {/* OPTIONAL: TOP AD SLOT */}
+        <AdUnit />
+
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
 
           {/* LEFT: HERO TEXT */}
@@ -97,6 +102,11 @@ export default function HomePage() {
               >
                 Post Your Business
               </button>
+            </div>
+
+            {/* AD SLOT UNDER BUTTONS */}
+            <div className="mt-10">
+               <AdUnit />
             </div>
           </div>
 
